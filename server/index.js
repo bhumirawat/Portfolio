@@ -6,118 +6,62 @@ import contactRoutes from './route/contactRoute.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// Load environment variables
 dotenv.config();
 
 const app = express();
 
-// CORS configuration
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow all origins in development, specific in production
-    if (process.env.NODE_ENV !== 'production') {
-      callback(null, true);
-    } else {
-      const allowedOrigins = [
-        process.env.CLIENT_URL,
-        'https://portfolio-eta-seven-krn0sknlne.vercel.app' // Replace with your actual Vercel URL
-      ].filter(Boolean);
-      
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
-};
+// Get __dirname for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-app.use(cors(corsOptions));
+// Middleware
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Database connection
-const MONGO_URI = process.env.MONGO_URI;
+// API Routes - MUST COME BEFORE STATIC FILES
+app.use('/contact', contactRoutes);
 
-if (MONGO_URI) {
-  mongoose
-    .connect(MONGO_URI)
-    .then(() => {
-      console.log("MongoDB connected successfully");
-    })
-    .catch((err) => {
-      console.error("MongoDB connection error:", err.message);
-    });
-} else {
-  console.warn("MONGO_URI not provided - running without database");
-}
-
-// Basic route - SHOULD BE FIRST
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Contact API Server is running!',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    endpoints: {
-      submitContact: 'POST /contact',
-      getAllContacts: 'GET /contact',
-      getContact: 'GET /contact/:id',
-      deleteContact: 'DELETE /contact/:id'
-    }
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 
-// Health check
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK',
     timestamp: new Date().toISOString(),
-    database: MONGO_URI ? (mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected') : 'Not configured'
+    database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'
   });
 });
 
-// API Routes - SHOULD COME BEFORE STATIC FILE SERVING
-app.use('/contact', contactRoutes);
-
-// Serve static files from client dist in production
-if (process.env.NODE_ENV === 'production') {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  
-  app.use(express.static(path.join(__dirname, '../client/dist')));
-  
-  // Handle client routing - THIS SHOULD BE LAST (AFTER ALL API ROUTES)
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
-  });
+// Database connection
+const MONGO_URI = process.env.MONGO_URI;
+if (MONGO_URI) {
+  mongoose.connect(MONGO_URI)
+    .then(() => console.log('✅ MongoDB connected'))
+    .catch(err => console.error('❌ MongoDB connection error:', err));
 }
 
-// 404 handler - MAKE SURE THIS COMES AFTER ALL OTHER ROUTES
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found'
-  });
+// Serve static files from client dist - AFTER API ROUTES
+app.use(express.static(path.join(__dirname, '../client/dist')));
+
+// FIXED: Use a parameter-based catch-all that works with path-to-regexp
+app.get('/:any*?', (req, res) => {
+  // Skip if it's an API route that should have been handled already
+  if (req.path.startsWith('/api/') || req.path.startsWith('/contact') || req.path === '/health') {
+    return res.status(404).json({ error: 'Route not found' });
+  }
+  
+  // Serve SPA for all other routes
+  res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
 });
 
-// Error handling middleware - SHOULD BE LAST
-app.use((error, req, res, next) => {
-  console.error('Server Error:', error);
-  res.status(500).json({ 
-    success: false,
-    message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? error.message : undefined
-  });
-});
-
-// Start server
 const PORT = process.env.PORT || 5000;
-
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
 
 export default app;
