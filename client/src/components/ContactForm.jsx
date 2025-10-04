@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:5000";
+const API_BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:5000';
 
 export default function Contact() {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
@@ -12,7 +12,8 @@ export default function Contact() {
     setStatus("Sending...");
 
     try {
-      await axios.post(`${API_BASE_URL}/api/contact`, form);
+      // ❌ FIX: Remove /api from the path - change to /contact
+      await axios.post(`${API_BASE_URL}/contact`, form); // CHANGED FROM /api/contact to /contact
       setStatus("Message sent successfully!");
       setForm({ name: "", email: "", message: "" });
     } catch (err) {
