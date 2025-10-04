@@ -19,9 +19,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API Routes - MUST COME BEFORE STATIC FILES
+// API Routes
 app.use('/contact', contactRoutes);
 
+// Basic routes
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Contact API Server is running!',
@@ -45,17 +46,11 @@ if (MONGO_URI) {
     .catch(err => console.error('❌ MongoDB connection error:', err));
 }
 
-// Serve static files from client dist - AFTER API ROUTES
+// Serve static files from client dist
 app.use(express.static(path.join(__dirname, '../client/dist')));
 
-// FIXED: Use a parameter-based catch-all that works with path-to-regexp
-app.get('/:any*?', (req, res) => {
-  // Skip if it's an API route that should have been handled already
-  if (req.path.startsWith('/api/') || req.path.startsWith('/contact') || req.path === '/health') {
-    return res.status(404).json({ error: 'Route not found' });
-  }
-  
-  // Serve SPA for all other routes
+// SPA catch-all route - MUST BE LAST
+app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
 });
 
