@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Your custom CSS */
+.Scroll {
+  width: 90%;
+  max-width: 1270px;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+}
+
+.latest-card {
+  padding: 2rem 0;
+  background-color: rgba(255, 255, 255, 0.05);
+  margin-top: 3rem;
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.card-grid {
+  display: flex;
+  padding-top: 2rem;
+  gap: 20px;
+  will-change: transform;
+  transition: transform 0.3s ease-out;
+  padding-bottom: 1rem;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  overflow-x: auto;
+}
+
+.card-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.card {
+  flex: 0 0 300px;
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
+  cursor: pointer;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.card-content {
+  padding: 1.5rem;
+  transition: transform 0.3s ease;
+  position: relative;
+  padding-bottom: 5rem;
+}
