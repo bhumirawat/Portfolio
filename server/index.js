@@ -3,60 +3,73 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import contactRoutes from './route/contactRoute.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
+// Load environment variables
 dotenv.config();
 
 const app = express();
-
-// Get __dirname for ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API Routes
-app.use('/contact', contactRoutes);
+// Routes
+app.use('/api', contactRoutes);
 
-// Basic routes
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Contact API Server is running!',
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
-
+// Health check route
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'
+  const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+  res.status(200).json({
+    success: true,
+    message: 'Server is running successfully',
+    database: dbStatus,
+    timestamp: new Date().toISOString()
   });
 });
 
-// Database connection
-const MONGO_URI = process.env.MONGO_URI;
-if (MONGO_URI) {
-  mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ MongoDB connected'))
-    .catch(err => console.error('❌ MongoDB connection error:', err));
-}
-
-// Serve static files from client dist
-app.use(express.static(path.join(__dirname, '../client/dist')));
-
-// SPA catch-all route - MUST BE LAST
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found'
+  });
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Error handling middleware
+app.use((error, req, res, next) => {
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error'
+  });
 });
 
-export default app;
+// Database connection and server start
+const startServer = async () => {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+    });
+    
+    // Start server
+    app.listen(PORT, () => {});
+    
+  } catch (error) {
+    // Start server without database connection
+    app.listen(PORT, () => {});
+  }
+};
+
+// Handle graceful shutdown
+process.on('SIGINT', async () => {
+  await mongoose.connection.close();
+  process.exit(0);
+});
+
+// Start the server
+startServer();

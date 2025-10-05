@@ -5,15 +5,9 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 3000, // ❌ FIX: Changed from 5000 to 3000 (client should run on different port than server)
+    port: 3000,
     proxy: {
-      // ❌ FIX: Add proxy configuration for API calls in development
-      '/contact': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/health': {
+      '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
@@ -26,5 +20,9 @@ export default defineConfig({
   },
   define: {
     'process.env': {}
+  },
+   // Add this for proper SPA routing in production
+  preview: {
+    port: 3000
   }
 })
