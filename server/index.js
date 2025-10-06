@@ -9,29 +9,30 @@ dotenv.config();
 
 const app = express();
 
-// Allowed origins
-const allowedOrigins = [
-  'https://portfolio-fc1v.vercel.app', // frontend production
-  'http://localhost:3000'               // frontend local
-];
-
-// CORS configuration
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // allow Postman, curl, etc.
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error('Not allowed by CORS'));
-  },
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  credentials: true
-}));
-
-app.options('*', cors()); // handle preflight requests
-
 // Body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// ✅ CORS - allow both localhost and frontend production
+const allowedOrigins = [
+  'https://portfolio-fc1v.vercel.app',
+  'http://localhost:3000'
+];
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200); // preflight request
+  }
+  next();
+});
 
 // Routes
 app.use('/api', contactRoutes);
@@ -39,12 +40,7 @@ app.use('/api', contactRoutes);
 // Health check
 app.get('/health', async (req, res) => {
   const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-  res.status(200).json({
-    success: true,
-    message: 'Server is running',
-    database: dbStatus,
-    timestamp: new Date().toISOString()
-  });
+  res.status(200).json({ success: true, message: 'Server running', database: dbStatus });
 });
 
 // 404 & error handlers
@@ -68,10 +64,13 @@ const connectDB = async () => {
   return cached.conn;
 };
 
-// Export serverless handler for Vercel
-export default serverless(app);
+// Export serverless handler
+export default async function handler(req, res) {
+  await connectDB();
+  return serverless(app)(req, res);
+}
 
-// Local dev server
+// Local dev
 if (process.env.NODE_ENV !== 'production') {
   connectDB().then(() => {
     const PORT = process.env.PORT || 5000;
