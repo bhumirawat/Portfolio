@@ -18,7 +18,7 @@ const allowedOrigins = [
 // CORS configuration
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // allow non-browser requests like Postman
+    if (!origin) return callback(null, true); // allow Postman, curl, etc.
     if (allowedOrigins.includes(origin)) return callback(null, true);
     callback(new Error('Not allowed by CORS'));
   },
@@ -27,8 +27,7 @@ app.use(cors({
   credentials: true
 }));
 
-// Handle preflight requests
-app.options('*', cors());
+app.options('*', cors()); // handle preflight requests
 
 // Body parsers
 app.use(express.json());
@@ -48,7 +47,7 @@ app.get('/health', async (req, res) => {
   });
 });
 
-// 404 & Error handlers
+// 404 & error handlers
 app.use('*', (req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
 app.use((err, req, res, next) => res.status(500).json({ success: false, message: err.message || 'Internal server error' }));
 
@@ -69,13 +68,10 @@ const connectDB = async () => {
   return cached.conn;
 };
 
-// Export serverless handler
-export default async function handler(req, res) {
-  await connectDB();
-  return serverless(app)(req, res);
-}
+// Export serverless handler for Vercel
+export default serverless(app);
 
-// Optional: local dev server
+// Local dev server
 if (process.env.NODE_ENV !== 'production') {
   connectDB().then(() => {
     const PORT = process.env.PORT || 5000;
