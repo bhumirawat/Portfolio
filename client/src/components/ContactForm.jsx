@@ -118,7 +118,7 @@ export default function Contact() {
                      disabled:cursor-not-allowed transition-all rounded py-3 
                      font-semibold mt-6"
         >
-          {isLoading ? "Sending..." : "Send Message"}
+          Send Message
         </button>
         
         {status && (

@@ -10,15 +10,35 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
+// ✅ Define allowed origins explicitly
+const allowedOrigins = [
+  'https://portfolio-fc1v.vercel.app', // Your deployed frontend
+  'http://localhost:3000' // Local dev
+];
+
+// ✅ Enhanced CORS setup (handles preflight too)
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    // Allow non-browser requests (like curl/postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: true
 }));
+
+// ✅ Ensure preflight requests get a proper response
+app.options('*', cors());
+
+// Middleware to parse JSON and URL-encoded bodies
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
+// ✅ Routes
 app.use('/api', contactRoutes);
 
 // Health check route
@@ -40,11 +60,12 @@ app.use('*', (req, res) => {
   });
 });
 
-// Error handling middleware
+// Global error handler
 app.use((error, req, res, next) => {
+  console.error('Server Error:', error.message);
   res.status(500).json({
     success: false,
-    message: 'Internal server error'
+    message: error.message || 'Internal server error'
   });
 });
 
@@ -55,21 +76,25 @@ const startServer = async () => {
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
     });
-    
-    // Start server
-    app.listen(PORT, () => {});
-    
+
+    console.log('✅ Connected to MongoDB');
+
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
   } catch (error) {
-    // Start server without database connection
-    app.listen(PORT, () => {});
+    console.error('⚠️ Database connection failed:', error.message);
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT} (no DB connection)`);
+    });
   }
 };
 
-// Handle graceful shutdown
+// Graceful shutdown
 process.on('SIGINT', async () => {
   await mongoose.connection.close();
   process.exit(0);
 });
 
-// Start the server
+// Start server
 startServer();
