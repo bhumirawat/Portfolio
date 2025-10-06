@@ -11,21 +11,23 @@ const app = express();
 
 // Allowed origins
 const allowedOrigins = [
-  'https://portfolio-fc1v.vercel.app',
-  'http://localhost:3000'
+  'https://portfolio-fc1v.vercel.app', // frontend production
+  'http://localhost:3000'               // frontend local
 ];
 
-// CORS
+// CORS configuration
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
+    if (!origin) return callback(null, true); // allow non-browser requests like Postman
     if (allowedOrigins.includes(origin)) return callback(null, true);
     callback(new Error('Not allowed by CORS'));
   },
-  methods: ['GET','POST','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization','X-Requested-With'],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: true
 }));
+
+// Handle preflight requests
 app.options('*', cors());
 
 // Body parsers
@@ -47,8 +49,8 @@ app.get('/health', async (req, res) => {
 });
 
 // 404 & Error handlers
-app.use('*', (req, res) => res.status(404).json({ success:false, message:'Route not found' }));
-app.use((err, req, res, next) => res.status(500).json({ success:false, message: err.message || 'Internal server error' }));
+app.use('*', (req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
+app.use((err, req, res, next) => res.status(500).json({ success: false, message: err.message || 'Internal server error' }));
 
 // MongoDB connection (serverless-friendly)
 let cached = global.mongoose;
