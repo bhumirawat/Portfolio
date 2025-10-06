@@ -52,7 +52,7 @@ export default function Navbar() {
       {/* Desktop Resume Button */}
       <a
         className="hidden md:inline-block font-semibold px-4 py-1 rounded shadow border transition-all duration-300 bg-white text-[#141622] hover:bg-[#141622] hover:text-white hover:border-white"
-        href="/Resume.pdf"
+        href="/resume.pdf"
         target="_blank"
         rel="noreferrer"
       >
@@ -91,7 +91,7 @@ export default function Navbar() {
           ))}
           {/* Mobile Resume Button */}
           <a
-            href="/Resume.pdf"
+            href="/resume.pdf"
             target="_blank"
             rel="noreferrer"
             className="w-full text-center mt-2 font-semibold px-4 py-2 rounded shadow border bg-white text-[#141622] hover:bg-white/10 hover:text-white hover:border-white transition-all duration-300"
