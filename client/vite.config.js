@@ -21,8 +21,9 @@ export default defineConfig({
   define: {
     'process.env': {}
   },
-   // Add this for proper SPA routing in production
   preview: {
     port: 3000
-  }
+  },
+  // Add this for production deployment
+  base: '/',
 })

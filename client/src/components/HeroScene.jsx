@@ -4,7 +4,7 @@ import { OrbitControls, Environment, Lightformer } from "@react-three/drei";
 import { BallCollider, Physics, RigidBody } from "@react-three/rapier";
 import * as THREE from "three";
 import { easing } from "maath";
-import ErrorBoundary from "./ErrorBoundary";
+import ErrorBoundary from "./ErrorBoundary.jsx";
 import { FaGithub, FaLinkedin } from "react-icons/fa";
 
 // Color and material properties based on the CodeSandbox example
