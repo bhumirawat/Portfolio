@@ -3,18 +3,19 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import contactRoutes from './route/contactRoute.js';
+import serverless from 'serverless-http';
 
 dotenv.config();
 
 const app = express();
 
-// ✅ Allowed origins
+// Allowed origins
 const allowedOrigins = [
   'https://portfolio-fc1v.vercel.app',
   'http://localhost:3000'
 ];
 
-// ✅ CORS
+// CORS
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
@@ -25,14 +26,13 @@ app.use(cors({
   allowedHeaders: ['Content-Type','Authorization','X-Requested-With'],
   credentials: true
 }));
-
 app.options('*', cors());
 
-// ✅ Body parsers
+// Body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ Routes
+// Routes
 app.use('/api', contactRoutes);
 
 // Health check
@@ -46,36 +46,37 @@ app.get('/health', async (req, res) => {
   });
 });
 
-// 404 and error handlers
+// 404 & Error handlers
 app.use('*', (req, res) => res.status(404).json({ success:false, message:'Route not found' }));
 app.use((err, req, res, next) => res.status(500).json({ success:false, message: err.message || 'Internal server error' }));
 
-// MongoDB connection
-let isConnected = false;
+// MongoDB connection (serverless-friendly)
+let cached = global.mongoose;
+if (!cached) cached = global.mongoose = { conn: null, promise: null };
+
 const connectDB = async () => {
-  if (isConnected) return;
-  try {
-    await mongoose.connect(process.env.MONGODB_URI, {
+  if (cached.conn) return cached.conn;
+
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(process.env.MONGODB_URI, {
       serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
-    });
-    isConnected = true;
-    console.log('✅ Connected to MongoDB');
-  } catch (err) {
-    console.error('⚠️ MongoDB connection failed:', err.message);
+      socketTimeoutMS: 45000
+    }).then(m => m);
   }
+  cached.conn = await cached.promise;
+  return cached.conn;
 };
 
-// ✅ Local dev
-if (process.env.NODE_ENV !== 'production') {
-  const PORT = process.env.PORT || 5000;
-  connectDB().then(() => {
-    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-  });
+// Export serverless handler
+export default async function handler(req, res) {
+  await connectDB();
+  return serverless(app)(req, res);
 }
 
-// ✅ Export app for Vercel serverless
-export default async (req, res) => {
-  await connectDB();
-  app(req, res);
-};
+// Optional: local dev server
+if (process.env.NODE_ENV !== 'production') {
+  connectDB().then(() => {
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => console.log(`🚀 Local server running on port ${PORT}`));
+  });
+}
