@@ -4,10 +4,8 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
+    { "src": "/(.*\\.(js|mjs|css|png|jpg|jpeg|svg|ico|webp|json|map))", "dest": "/$1" },
+    { "src": "/.*", "dest": "/index.html" }
   ],
   "env": {
     "NODE_ENV": "production"
