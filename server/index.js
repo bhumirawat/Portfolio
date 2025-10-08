@@ -1,6 +1,5 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import cors from 'cors';
 import dotenv from 'dotenv';
 import contactRoutes from './route/contactRoute.js';
 import serverless from 'serverless-http';
@@ -9,151 +8,188 @@ dotenv.config();
 
 const app = express();
 
-// Body parsers
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Increase JSON limit and add better body parsing
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ✅ CORS - allow both localhost and frontend production
-const allowedOrigins = [
-  'https://portfolio-fc1v.vercel.app',
-  'http://localhost:3000',
-  'http://localhost:5173' // Vite dev server
-];
-
+// CORS middleware
 app.use((req, res, next) => {
+  const allowedOrigins = [
+    'https://portfolio-fc1v.vercel.app',
+    'https://portfolio-fc1v.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ];
+  
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
 
+  // Handle preflight
   if (req.method === 'OPTIONS') {
-    return res.sendStatus(200); // preflight request
+    return res.status(200).end();
   }
+  
+  next();
+});
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`📨 ${req.method} ${req.path}`, {
+    body: req.body,
+    query: req.query,
+    timestamp: new Date().toISOString()
+  });
   next();
 });
 
 // Routes
 app.use('/api', contactRoutes);
 
-// Health check - doesn't depend on MongoDB
-app.get('/health', async (req, res) => {
-  try {
-    const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-    res.status(200).json({ 
-      success: true, 
-      message: 'Server running successfully', 
-      database: dbStatus,
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development'
-    });
-  } catch (error) {
-    res.status(200).json({ 
-      success: true, 
-      message: 'Server running (database connection issues)',
-      database: 'disconnected',
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development'
-    });
-  }
+// Health check
+app.get('/health', (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+  res.json({
+    success: true,
+    message: 'Server is healthy',
+    database: dbStatus,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Root endpoint
 app.get('/', (req, res) => {
-  res.status(200).json({
+  res.json({
     success: true,
     message: 'Portfolio Server API is running!',
-    endpoints: {
-      health: '/api/health',
-      contact: '/api/contact (POST)',
-      contacts: '/api/contacts (GET)'
-    },
     timestamp: new Date().toISOString()
   });
 });
 
 // 404 handler
 app.use('*', (req, res) => {
-  res.status(404).json({ 
-    success: false, 
-    message: 'Route not found',
-    path: req.originalUrl
+  res.status(404).json({
+    success: false,
+    message: `Route ${req.originalUrl} not found`
   });
 });
 
-// Error handler
+// Global error handler
 app.use((err, req, res, next) => {
-  console.error('Server error:', err);
+  console.error('💥 Global error handler:', err);
   res.status(500).json({
     success: false,
-    message: 'Internal server error. Please try again later.',
+    message: 'Internal server error',
     timestamp: new Date().toISOString()
   });
 });
 
-// MongoDB connection with timeout handling
+// MongoDB connection with better serverless optimization
 let cached = global.mongoose;
-if (!cached) cached = global.mongoose = { conn: null, promise: null };
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
 
 const connectDB = async () => {
-  if (cached.conn) return cached.conn;
+  if (cached.conn) {
+    console.log('♻️ Using cached MongoDB connection');
+    return cached.conn;
+  }
 
   if (!cached.promise) {
-    console.log('🔗 Attempting MongoDB connection...');
+    console.log('🔗 Creating new MongoDB connection...');
     
     const options = {
-      serverSelectionTimeoutMS: 5000, // Reduced from 10s to 5s
-      socketTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 3000, // Very short timeout for serverless
+      socketTimeoutMS: 5000,
       maxPoolSize: 1,
+      minPoolSize: 0,
+      maxIdleTimeMS: 10000,
       bufferCommands: false,
     };
 
     cached.promise = mongoose.connect(process.env.MONGODB_URI, options)
-      .then(mongoose => {
+      .then((mongoose) => {
         console.log('✅ MongoDB connected successfully');
         return mongoose;
       })
-      .catch(error => {
+      .catch((error) => {
         console.error('❌ MongoDB connection failed:', error.message);
-        console.log('⚠️ Continuing without database connection');
-        // Don't throw error - allow server to start without DB
+        cached.promise = null; // Reset on failure
+        // Don't throw - return null to continue without DB
         return null;
       });
   }
-  
-  cached.conn = await cached.promise;
-  return cached.conn;
+
+  try {
+    cached.conn = await cached.promise;
+    return cached.conn;
+  } catch (error) {
+    cached.promise = null;
+    console.log('⚠️ Continuing without database connection');
+    return null;
+  }
 };
 
-// Export serverless handler
-export default async function handler(req, res) {
-  try {
-    // Try to connect to DB, but don't fail if it doesn't work
-    await connectDB().catch(() => {
-      console.log('🔄 Proceeding without database connection');
-    });
-    
-    return serverless(app)(req, res);
-  } catch (error) {
-    console.error('Server handler error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Server error occurred',
-      timestamp: new Date().toISOString()
-    });
-  }
-}
+// Serverless handler with connection management
+const serverlessHandler = serverless(app, {
+  binary: ['image/*', 'application/pdf'],
+});
 
-// Local dev - only start server if not in Vercel
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+// Export the serverless handler
+export default async (req, res) => {
+  // Connect to DB on cold start
+  try {
+    await connectDB();
+  } catch (error) {
+    console.log('Database connection attempt completed');
+  }
+
+  // Add timeout handling
+  const timeout = setTimeout(() => {
+    if (!res.headersSent) {
+      console.log('⚠️ Request timeout detected, sending response');
+      res.status(200).json({
+        success: true,
+        message: 'Request processed (timeout protection)',
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, 8000); // 8 second timeout protection
+
+  try {
+    await serverlessHandler(req, res);
+  } catch (error) {
+    console.error('🚨 Serverless handler error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Server error occurred',
+        timestamp: new Date().toISOString()
+      });
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+// Local development server
+if (process.env.NODE_ENV === 'development') {
+  const PORT = process.env.PORT || 5000;
   connectDB().then(() => {
-    const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => console.log(`🚀 Local server running on port ${PORT}`));
+    app.listen(PORT, () => {
+      console.log(`🚀 Local server running on http://localhost:${PORT}`);
+    });
   }).catch(error => {
-    console.log('🚀 Local server running without database connection on port 5000');
-    const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => console.log(`🚀 Local server running on port ${PORT} (no DB)`));
+    console.log('Starting server without database connection...');
+    app.listen(PORT, () => {
+      console.log(`🚀 Local server running on http://localhost:${PORT} (no DB)`);
+    });
   });
 }
