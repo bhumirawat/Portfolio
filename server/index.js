@@ -55,13 +55,37 @@ const connectDB = async () => {
   if (cached.conn) return cached.conn;
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(process.env.MONGODB_URI, {
+    console.log('🔗 Connecting to MongoDB...');
+    
+    const options = {
       serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000
-    }).then(m => m);
+      socketTimeoutMS: 45000,
+      bufferCommands: false,
+      // Add these for better serverless compatibility
+      maxPoolSize: 1,
+      minPoolSize: 0,
+      maxIdleTimeMS: 30000
+    };
+
+    cached.promise = mongoose.connect(process.env.MONGODB_URI, options)
+      .then(mongoose => {
+        console.log('✅ MongoDB connected successfully');
+        return mongoose;
+      })
+      .catch(error => {
+        console.error('❌ MongoDB connection failed:', error.message);
+        cached.promise = null; // Reset on error
+        throw error;
+      });
   }
-  cached.conn = await cached.promise;
-  return cached.conn;
+  
+  try {
+    cached.conn = await cached.promise;
+    return cached.conn;
+  } catch (error) {
+    cached.promise = null;
+    throw error;
+  }
 };
 
 // Export serverless handler
