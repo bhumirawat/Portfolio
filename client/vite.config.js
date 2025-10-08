@@ -18,6 +18,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    assetsInclude: ['**/*.pdf'], 
   },
   define: {
     'process.env': {}
@@ -28,4 +29,5 @@ export default defineConfig({
   },
   // Remove base or set to empty
   base: './',
+  publicDir: 'public',
 })
