@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import resumePDF from '../resume.pdf';
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
