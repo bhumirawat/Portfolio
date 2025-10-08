@@ -33,7 +33,7 @@ const Footer = () => {
         {/* Copyright Notice */}
         <div className="text-center text-sm">
           <p>
-            &copy; {currentYear} | Designed & Developed By: Developer Bhumika
+            &copy; {currentYear} | Designed & Developed By: Bhumika
           </p>
         </div>
 
